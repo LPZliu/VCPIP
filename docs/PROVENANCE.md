@@ -15,6 +15,4 @@ This project builds on data-loading, evaluation, and network components from the
 }
 ```
 
-[LMVCAT](https://github.com/justsmart/LMVCAT) provided the repository layout reference.
-
 No license file was included with the supplied RANK codebase. This repository does not grant an additional license for third-party material.

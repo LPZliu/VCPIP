@@ -91,4 +91,8 @@ python -m unittest discover -s tests -v
 
 ## Acknowledgments
 
-We acknowledge [RANK](https://arxiv.org/pdf/2303.17117) for the data and evaluation foundation, and [LMVCAT](https://github.com/justsmart/LMVCAT) for the repository layout reference. See [attribution](docs/PROVENANCE.md).
+We acknowledge [RANK](https://arxiv.org/pdf/2303.17117) for the data and evaluation foundation.
+
+## Contact
+
+[kevin_ailover@163.com](mailto:kevin_ailover@163.com)
