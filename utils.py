@@ -1,5 +1,3 @@
-"""Small, shared reproducibility and logging helpers."""
-
 import logging
 import random
 from pathlib import Path

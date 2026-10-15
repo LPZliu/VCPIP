@@ -1,10 +1,3 @@
-"""Nine metrics in the order used by the supplied experiment.
-
-Ranking/AP/coverage routines derive from the original evaluation.py, attributed
-there to L. Yang, X.-Z. Wu, Y. Jiang and Z.-H. Zhou, Multi-label Deep Forest,
-ECAI 2020. The legacy top-k AUC definition derives from the iMVWL routine.
-Undefined AUC is NaN; zero-positive rows have AP=0 and coverage=0.
-"""
 import numpy as np
 from sklearn import metrics
 
@@ -54,7 +47,6 @@ def compute_average_precision(y_prob, label):
     return precision / num_samples
 
 def mlc_auc(probabilities, labels):
-    """Legacy top-k ROC AUC, vectorized; preserves the original endpoint range."""
     n, c = labels.shape
     positives = labels.sum()
     negatives = labels.size - positives

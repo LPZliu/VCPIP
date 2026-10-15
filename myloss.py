@@ -1,16 +1,9 @@
-"""VCPIP objectives, numbered by the supplied manuscript's Eqs. (4)-(12)."""
-
 import torch
 from torch import nn
 from torch.nn import functional as F
 
 
 def masked_binary_cross_entropy(prediction, target, mask):
-    """Eq. (11): masked sum divided by n*c, not by observed-label count.
-
-    The same batch/label reduction is used for the otherwise unspecified
-    reduction in Eq. (5). A completely masked batch has zero loss/gradient.
-    """
     if prediction.shape != target.shape or mask.shape != target.shape:
         raise ValueError("prediction, target and mask must have identical shapes")
     return (F.binary_cross_entropy(prediction, target, reduction="none") * mask).mean()
@@ -18,12 +11,6 @@ def masked_binary_cross_entropy(prediction, target, mask):
 
 def progressive_multiview_loss(stage_probabilities, cumulative_probabilities,
                                labels, view_mask, label_mask):
-    """Eqs. (4)-(5): latest residual plus supervision of EVERY prefix.
-
-    p_t denotes an incremental probability, not an independent sigmoid output;
-    the bounded parameterization is documented in model.py. Unknown labels and
-    unavailable views do not supervise classifiers. Residual targets are detached.
-    """
     losses = []
     for v, (increments, prefixes) in enumerate(zip(stage_probabilities, cumulative_probabilities)):
         mask = label_mask * view_mask[:, v:v + 1]
@@ -36,7 +23,6 @@ def progressive_multiview_loss(stage_probabilities, cumulative_probabilities,
 
 
 def orthogonality_loss(shared, private, view_mask):
-    """Eq. (6): sum over views, mean over samples of squared cosine."""
     terms = []
     for v, (consistent, specific) in enumerate(zip(shared, private)):
         cosine = (F.normalize(consistent, dim=-1) * F.normalize(specific, dim=-1)).sum(-1)
@@ -45,7 +31,6 @@ def orthogonality_loss(shared, private, view_mask):
 
 
 def reconstruction_loss(reconstructions, original_views, view_mask):
-    """Eq. (7): reconstruct ORIGINAL uncorrupted inputs, sum over views."""
     terms = []
     for v, (prediction, original) in enumerate(zip(reconstructions, original_views)):
         error = (prediction - original).square().mean(dim=-1)
@@ -54,7 +39,6 @@ def reconstruction_loss(reconstructions, original_views, view_mask):
 
 
 class VCPIPLoss(nn.Module):
-    """Eq. (12): L_mc + L_mv + alpha*L_orth + beta*L_re, and nothing else."""
 
     def __init__(self, alpha=1.0, beta=0.1):
         super().__init__()

@@ -1,5 +1,3 @@
-"""Synthetic MATLAB split/normalization checks and independent metric oracles."""
-
 from pathlib import Path
 import sys
 import tempfile

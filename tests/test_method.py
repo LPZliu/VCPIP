@@ -1,5 +1,3 @@
-"""Independent numeric and synthetic integration checks; no benchmark training."""
-
 import math
 from pathlib import Path
 import sys
@@ -23,7 +21,6 @@ from myloss import (
 
 
 def manual_bce(probabilities, targets, mask):
-    """Scalar Python oracle with the manuscript's n*c denominator."""
     total = 0.0
     for i, row in enumerate(probabilities):
         for j, probability in enumerate(row):
@@ -65,7 +62,6 @@ class ObjectiveTests(unittest.TestCase):
             torch.ones((2, 1), dtype=torch.float64), self.label_mask,
         )
         loss.backward()
-        # Each prefix is independent here: only its own BCE may differentiate it.
         expected_prefix_grad = ((.35 - self.labels) / (.35 * .65)) * self.label_mask / 4
         expected_increment_grad = ((.1 - self.labels * .65) / (.1 * .9)) * self.label_mask / 4
         torch.testing.assert_close(prefixes[1].grad, expected_prefix_grad, rtol=1e-12, atol=1e-12)
@@ -75,14 +71,12 @@ class ObjectiveTests(unittest.TestCase):
         shared = [torch.tensor([[1., 0.], [1., 0.]])] * 2
         private = [torch.tensor([[1., 0.], [0., 1.]]), torch.tensor([[1., 0.], [1., 0.]])]
         mask = torch.tensor([[1., 1.], [1., 0.]])
-        # View 1 contributes (1 + 0)/2; view 2 contributes (1 + masked 1)/2.
         self.assertEqual(float(orthogonality_loss(shared, private, mask)), 1.0)
 
     def test_eq7_uses_original_targets_feature_mean_and_view_mask(self):
         originals = [torch.tensor([[1., 3.], [2., 4.]]), torch.tensor([[0.], [2.]])]
         reconstructions = [torch.tensor([[3., 1.], [9., 9.]]), torch.tensor([[1.], [3.]])]
         mask = torch.tensor([[1., 1.], [0., 1.]])
-        # ((4+4)/2 + masked error)/2 + (1+1)/2 = 3.
         self.assertEqual(float(reconstruction_loss(reconstructions, originals, mask)), 3.0)
 
     def test_eq11_denominator_and_completely_masked_gradients(self):

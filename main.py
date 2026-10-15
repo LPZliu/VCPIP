@@ -1,9 +1,3 @@
-"""Train and evaluate VCPIP with explicit manuscript implementation conventions.
-
-Run ``python main.py --help`` for configuration, or ``--smoke-test`` for a
-synthetic implementation check that does not load or train a real dataset.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -43,7 +37,6 @@ def make_logger(output_dir):
 
 
 def _json_safe(value):
-    """Represent undefined metrics as JSON null instead of nonstandard NaN."""
     if isinstance(value, dict):
         return {str(key): _json_safe(item) for key, item in value.items()}
     if isinstance(value, (tuple, list)):
@@ -80,7 +73,6 @@ def move_batch(batch, device):
 
 @contextmanager
 def singleton_batchnorm_guard(model, batch_size):
-    """Retain the final sample without fitting BatchNorm from a singleton."""
     layers = [
         layer for layer in model.modules()
         if batch_size == 1 and isinstance(layer, nn.modules.batchnorm._BatchNorm)
@@ -96,7 +88,6 @@ def singleton_batchnorm_guard(model, batch_size):
 
 
 def train_one_epoch(loader, model, criterion, optimizer, device, eta=0.2, max_batches=0):
-    """Optimize Eq. (12); reconstruction targets remain the original inputs."""
     model.train()
     totals = {}
     samples = 0
@@ -129,13 +120,6 @@ def train_one_epoch(loader, model, criterion, optimizer, device, eta=0.2, max_ba
 
 
 def compute_view_confidence(view_probabilities, labels, view_mask, label_mask):
-    """Return sufficient statistics for balanced VCS, Eq. (1).
-
-    Each row is [positive probability sum, positive count, negative correctness
-    sum, negative count]. Accumulating these across batches gives a dataset-wide
-    score without overweighting the final, possibly shorter batch. Unknown
-    labels and absent views do not contribute to either count.
-    """
     statistics = []
     for view_index, probability in enumerate(view_probabilities):
         valid = label_mask * view_mask[:, view_index:view_index + 1]
@@ -150,7 +134,6 @@ def compute_view_confidence(view_probabilities, labels, view_mask, label_mask):
 
 @torch.no_grad()
 def evaluate(loader, model, device, max_batches=0):
-    """Evaluate final predictions and accumulate validation confidence."""
     model.eval()
     predictions, labels_all = [], []
     confidence_stats = None
@@ -192,11 +175,6 @@ def evaluate(loader, model, device, max_batches=0):
 
 
 def evaluate_and_add_layers(model, validation, optimizer, threshold=0.99, max_view_layers=3):
-    """Apply Eqs. (2)-(3) to supported views and register every new parameter.
-
-    Call this only after saving the model associated with validation results.
-    The maximum stage count is an exposed implementation choice.
-    """
     supported = [
         (index, score) for index, score in enumerate(validation["confidence"])
         if score is not None and np.isfinite(score)
@@ -228,7 +206,6 @@ def evaluate_and_add_layers(model, validation, optimizer, threshold=0.99, max_vi
 
 def save_checkpoint(path, model, model_config, *, train_config=None, epoch=0,
                     validation=None, optimizer=None):
-    """Save portable tensor state and explicit architecture, never a model pickle."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     checkpoint = {
@@ -246,7 +223,6 @@ def save_checkpoint(path, model, model_config, *, train_config=None, epoch=0,
 
 
 def load_checkpoint(path, device="cpu"):
-    """Rebuild all dynamic stages before loading a weights-only checkpoint."""
     checkpoint = torch.load(path, map_location=device, weights_only=True)
     if checkpoint.get("format_version") != 1:
         raise ValueError("Unsupported checkpoint format; use a checkpoint created by main.py.")
@@ -280,7 +256,6 @@ def build_loader(args, paths, fold_index, mode):
 
 
 def selection_score(validation):
-    """Use the inherited AP/ranking/AUC validation criterion explicitly."""
     metrics = validation["metrics"]
     values = [metrics["AP"], metrics["1-RL"], metrics["AUC"]]
     if not all(value is not None and np.isfinite(value) for value in values):
@@ -322,7 +297,6 @@ def train(args, output_dir, logger, device):
                     train_config={**vars(args), "fold_index": fold_index},
                     epoch=epoch, validation=validation,
                 )
-            # The checkpoint above corresponds exactly to the validated topology.
             growth = (
                 evaluate_and_add_layers(model, validation, optimizer, args.threshold, args.max_view_layers)
                 if epoch + 1 < args.epochs else {"expanded": False, "reason": "last_epoch"}
@@ -364,7 +338,6 @@ def train(args, output_dir, logger, device):
 
 
 def smoke_test(args, output_dir, device):
-    """Check gradients, growth, original-input preservation, and checkpoint parity."""
     seed_everything(args.seed)
     model_config = {"input_dims": [8, 10, 6], "n_labels": 4, "num_experts": 2}
     model = VCPIP(**model_config).to(device)
@@ -427,7 +400,7 @@ def smoke_test(args, output_dir, device):
 
 def parse_args(argv=None):
     base = Path(__file__).resolve().parent
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(description="Train and evaluate VCPIP.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--dataset", default="corel5k")
     parser.add_argument("--data-root", type=Path, default=base / "data")
     parser.add_argument("--output-dir", type=Path, default=None)
@@ -440,19 +413,19 @@ def parse_args(argv=None):
     parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--lr", type=float, default=0.1)
     parser.add_argument("--momentum", type=float, default=0.9)
-    parser.add_argument("--alpha", type=float, default=1.0, help="Eq. (12) orthogonality coefficient")
-    parser.add_argument("--beta", type=float, default=0.1, help="Eq. (12) reconstruction coefficient")
+    parser.add_argument("--alpha", type=float, default=1.0, help="Orthogonality coefficient")
+    parser.add_argument("--beta", type=float, default=0.1, help="Reconstruction coefficient")
     parser.add_argument("--threshold", type=float, default=0.99, help="VCA expansion threshold tau")
     parser.add_argument("--eta", type=float, default=0.2, help="SCFS fragment proportion")
     parser.add_argument("--num-experts", type=int, default=4)
-    parser.add_argument("--max-view-layers", type=int, default=3, help="Maximum total stages per view (implementation choice)")
+    parser.add_argument("--max-view-layers", type=int, default=3, help="Maximum total stages per view")
     parser.add_argument("--mask-view-ratio", type=float, default=0.5)
     parser.add_argument("--mask-label-ratio", type=float, default=0.5)
     parser.add_argument("--training-sample-ratio", type=float, default=0.7)
     parser.add_argument("--validation-ratio", type=float, default=0.15)
     parser.add_argument("--normalization", choices=("train", "legacy-all"), default="train",
-                        help="Fit observed training views only, or retain historical all-data normalization")
-    parser.add_argument("--max-train-batches", type=int, default=0, help="0 means all batches; a positive cap is not a benchmark run")
+                        help="Fit normalization on observed training views or all samples")
+    parser.add_argument("--max-train-batches", type=int, default=0, help="Maximum training batches; 0 means all batches")
     parser.add_argument("--max-eval-batches", type=int, default=0, help="0 means all batches; capped metrics are partial")
     parser.add_argument("--checkpoint", type=Path, default=None, help="Evaluate this saved model only; no training")
     parser.add_argument("--smoke-test", action="store_true", help="Run a synthetic gradient/growth/checkpoint check only")
@@ -494,7 +467,6 @@ def main(argv=None):
             raise ValueError(
                 "This checkpoint lacks the dataset metadata required for evaluation: "
                 + ", ".join(missing_fields)
-                + ". Synthetic smoke checkpoints are only for implementation checks."
             )
         for field in data_fields:
             setattr(args, field, saved_config[field])
@@ -513,7 +485,7 @@ def main(argv=None):
     logger.info("VCPIP | device %s | outputs %s", device, output_dir)
     if args.smoke_test:
         result = smoke_test(args, output_dir, device)
-        logger.info("Synthetic implementation checks passed; no real dataset was loaded or trained.")
+        logger.info("Smoke test passed.")
     elif args.checkpoint:
         fold_index = args.fold_index
         logger.info("Dataset, split, masks, normalization, and fold restored from the checkpoint.")

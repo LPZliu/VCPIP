@@ -1,10 +1,3 @@
-"""Load the six-view MATLAB data/fold format used by the supplied RANK bundle.
-
-Training-only normalization is the default. Validation/test expose full labels,
-following the supplied split protocol; training exposes only observed labels.
-No dataset files are distributed by this repository.
-"""
-
 import math
 from pathlib import Path
 
@@ -17,7 +10,6 @@ from torch.utils.data import Dataset, DataLoader
 
 def load_incomplete_fold(mat_path, fold_mat_path, fold_idx=0,
                          training_ratio=0.7, normalization="train"):
-    """Read and validate one fold; fit scaling only on observed training views."""
     for path in (mat_path, fold_mat_path):
         if not Path(path).is_file():
             raise FileNotFoundError(f"Dataset file missing: {path}. See data/README.md.")

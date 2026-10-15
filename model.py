@@ -1,13 +1,3 @@
-"""VCPIP architecture: VCA branches, MOEDF features, and SCFS augmentation.
-
-This is a paper-guided implementation, not a checkpoint-compatible rewrite of
-the earlier experimental ``new_model.py``. Two choices left unspecified by the
-paper are explicit here: the embedding dimension equals the label count for
-the elementwise product in Eq. (10), and additive classifier probabilities use
-remaining-probability gates so that the cumulative predictions in Eq. (5) are
-valid BCE inputs. Neither choice is presented as an additional contribution.
-"""
-
 from __future__ import annotations
 
 from typing import Sequence
@@ -20,13 +10,6 @@ from torch.nn import functional as F
 def stochastic_cross_sample_fragment_swap(
     views: Sequence[Tensor], availability: Tensor, eta: float = 0.2
 ) -> list[Tensor]:
-    """SCFS, Eq. (8): replace one contiguous feature fragment per sample.
-
-    Donors and recipients must both have the view, and a sample cannot donate
-    to itself. Donors are sampled independently and may repeat. A view with
-    fewer than two observed samples is unchanged. The caller's list and tensors
-    remain untouched so Eq. (7) can reconstruct the original, clean inputs.
-    """
     if not 0.0 <= eta <= 1.0:
         raise ValueError("eta must be between 0 and 1")
     augmented = list(views)
@@ -43,7 +26,6 @@ def stochastic_cross_sample_fragment_swap(
         if fragment_length == 0 or sample_count < 2:
             continue
 
-        # A nonzero cyclic offset samples uniformly from all other observed rows.
         recipient_positions = torch.arange(sample_count, device=features.device)
         offsets = torch.randint(1, sample_count, (sample_count,), device=features.device)
         donor_rows = observed[(recipient_positions + offsets) % sample_count]
@@ -65,7 +47,6 @@ def stochastic_cross_sample_fragment_swap(
 
 
 class QualityNetwork(nn.Module):
-    """Input-dependent expert routing used inside the MOEDF components."""
 
     def __init__(self, input_dim: int, num_experts: int):
         super().__init__()
@@ -80,11 +61,6 @@ class QualityNetwork(nn.Module):
 
 
 class MoEDecouple(nn.Module):
-    """MOEDF, Section 3.2: independently routed shared and private experts.
-
-    Orthogonality is enforced by the Eq. (6) loss, not by projecting features
-    in this module. The four-expert default follows the paper's supplement.
-    """
 
     def __init__(self, latent_dim: int, num_experts: int = 4):
         super().__init__()
@@ -108,7 +84,6 @@ class MoEDecouple(nn.Module):
 
 
 class MoEFuser(nn.Module):
-    """MOEDF fusion: expert-weighted reconstruction of a view representation."""
 
     def __init__(self, latent_dim: int, num_experts: int = 4):
         super().__init__()
@@ -125,7 +100,6 @@ class MoEFuser(nn.Module):
 
 
 class Encoder(nn.Module):
-    """View encoder; hidden widths retain the supplied experiment's layout."""
 
     def __init__(self, input_dim: int, latent_dim: int):
         super().__init__()
@@ -142,7 +116,6 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    """Map the MOEDF representation back to the original view for Eq. (7)."""
 
     def __init__(self, input_dim: int, latent_dim: int):
         super().__init__()
@@ -159,14 +132,6 @@ class Decoder(nn.Module):
 
 
 class DynamicBoostingClassifier(nn.Module):
-    """VCA stage outputs and their sums for Eqs. (4)-(5).
-
-    Each stage applies a Linear/ReLU classifier and a Linear/Sigmoid probability
-    readout to the original encoded view. The paper leaves the probability
-    parameterization unspecified. We use p_1=q_1 and p_t=(1-P_{t-1})*q_t, where
-    q_t is the stage sigmoid output. Therefore P_t=sum_{k<=t} p_k stays in [0,1].
-    The Eq. (4) residual target is computed separately by the loss function.
-    """
 
     def __init__(self, latent_dim: int, n_labels: int):
         super().__init__()
@@ -181,7 +146,6 @@ class DynamicBoostingClassifier(nn.Module):
         )
 
     def add_boost_layer(self) -> nn.Module:
-        """Append a stage on the same device and dtype as the current branch."""
         reference = next(self.parameters())
         stage = self._make_stage().to(device=reference.device, dtype=reference.dtype)
         stage.train(self.training)
@@ -202,11 +166,6 @@ class DynamicBoostingClassifier(nn.Module):
 
 
 def masked_view_softmax(scores: Tensor, availability: Tensor) -> Tensor:
-    """Eq. (9) over observed views; all-missing rows receive zero weights.
-
-    Dataset construction should retain at least one observed view per sample.
-    The all-missing fallback avoids NaNs and gives the final regression's prior.
-    """
     observed = availability.to(device=scores.device) > 0
     masked_scores = scores.masked_fill(~observed, -torch.inf)
     all_missing = ~observed.any(dim=1, keepdim=True)
@@ -215,13 +174,6 @@ def masked_view_softmax(scores: Tensor, availability: Tensor) -> Tensor:
 
 
 class VCPIP(nn.Module):
-    """Connect SCFS, VCA, MOEDF and the weighted prediction in Eqs. (9)-(10).
-
-    ``latent_dim == n_labels`` is an explicit implementation convention: Eq.
-    (10) multiplies label probabilities and structural features elementwise but
-    the paper supplies no intervening projection or embedding size. Missing
-    views are excluded from Eq. (9)'s softmax as an availability convention.
-    """
 
     def __init__(
         self, input_dims: Sequence[int], n_labels: int, num_experts: int = 4,
@@ -238,7 +190,7 @@ class VCPIP(nn.Module):
         if self.n_labels < 1 or self.num_experts < 1:
             raise ValueError("n_labels and num_experts must be positive")
         if self.latent_dim != self.n_labels:
-            raise ValueError("Eq. (10) requires latent_dim == n_labels in this implementation")
+            raise ValueError("latent_dim must equal n_labels")
 
         self.encoder_list = nn.ModuleList([
             Encoder(dim, self.latent_dim) for dim in self.input_dims
@@ -271,7 +223,6 @@ class VCPIP(nn.Module):
 
     @property
     def boost_counts(self) -> list[int]:
-        """Number of auxiliary stages per view; excludes the primary stage."""
         return [len(branch.stages) - 1 for branch in self.view_classifiers]
 
     def add_classifier_layer(self, view_idx: int) -> nn.Module:
@@ -321,7 +272,6 @@ class VCPIP(nn.Module):
         weights = view_weights.unsqueeze(-1)
         semantic = (weights * stacked_predictions).sum(dim=1)
         structural = (weights * torch.stack(refined, dim=1)).sum(dim=1)
-        # Eq. (10): weighted semantic probabilities times structural softmax.
         fused = semantic * F.softmax(structural, dim=-1)
         predictions = torch.sigmoid(self.regression(F.relu(fused)))
         return {
@@ -341,5 +291,4 @@ class VCPIP(nn.Module):
 
 
 def get_model(input_dims, n_labels, device="cpu", **kwargs) -> VCPIP:
-    """Construct the paper-guided model on the requested device."""
     return VCPIP(input_dims, n_labels, **kwargs).to(device)
