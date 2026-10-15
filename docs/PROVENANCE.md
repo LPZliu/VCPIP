@@ -4,7 +4,7 @@
 
 The method specification was the supplied manuscript **View Confidence Perception-Driven Incremental Prediction for Incomplete Multi-view Multi-label Learning**, by Pingzhu Liu, Zunnan Xu, Chunming He, Zhirui Fang, Zitong Yu, Xiu Li, and Chengliang Liu. The method/code map refers to its numbered equations and sections.
 
-The work is cited as a 2026 manuscript. A publication link can be added when available; the manuscript PDF is not included in this source release.
+The work is a **NeurIPS 2026 (NIPS 2026)** paper. A publication link can be added when available; the paper PDF is not included in this source release.
 
 ## Starting code
 

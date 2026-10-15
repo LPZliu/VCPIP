@@ -1,6 +1,6 @@
-# VCPIP
+# VCPIP (NeurIPS 2026)
 
-Code for **View Confidence Perception-Driven Incremental Prediction for Incomplete Multi-view Multi-label Learning**.
+Code for the **NeurIPS 2026 (NIPS 2026)** paper **View Confidence Perception-Driven Incremental Prediction for Incomplete Multi-view Multi-label Learning**.
 
 VCPIP combines validation-guided incremental classifiers, mixture-of-experts decoupling and fusion, and stochastic cross-sample fragment swapping for incomplete multi-view multi-label classification.
 
@@ -118,14 +118,14 @@ Default manuscript settings are SGD, learning rate `0.1`, momentum `0.9`, batch 
 
 ## Citation and attribution
 
-Bibliographic details below are transcribed from the supplied manuscript. No accepted venue, DOI, or public preprint identifier is asserted.
+If you find this code useful, please cite our NeurIPS 2026 paper:
 
 ```bibtex
-@misc{liu2026vcpip,
+@inproceedings{liu2026vcpip,
   title={View Confidence Perception-Driven Incremental Prediction for Incomplete Multi-view Multi-label Learning},
   author={Liu, Pingzhu and Xu, Zunnan and He, Chunming and Fang, Zhirui and Yu, Zitong and Li, Xiu and Liu, Chengliang},
-  year={2026},
-  note={Manuscript}
+  booktitle={Advances in Neural Information Processing Systems},
+  year={2026}
 }
 ```
 
